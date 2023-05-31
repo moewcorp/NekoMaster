@@ -1,10 +1,10 @@
 {
-  "Author": "gamous",
-  "Name": "NekoMaster",
-  "Punchline": "A short one-liner that shows up in /xlplugins.",
-  "Description": "A description that shows up in /xlplugins. List any major slash-command(s).",
-  "InternalName": "NekoMaster",
-  "ApplicableVersion": "any",
-  "Tags": [
-  ]
+    "Author": "gamous",
+    "Name": "NekoMaster",
+    "Punchline": "Let neko manage your plugins!",
+    "Description": "Super plugin manager with friendly UI and commands.",
+    "InternalName": "NekoMaster",
+    "ApplicableVersion": "any",
+    "Tags": [
+    ]
 }
