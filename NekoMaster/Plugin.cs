@@ -96,6 +96,13 @@ namespace NekoMaster
                 var plugin = PluginQuery(name);
                 PluginLog.Log($"{plugin}");
                 bool isLoaded = (bool)plugin.GetFoP("IsLoaded");
+                string pst = (string)plugin.GetFoP("State").ToString();
+                object manifest = plugin.GetFoP("Manifest");
+                if (pst.Contains("Error"))
+                {
+                    plugin.SetFoP("State", 0);
+                    manifest.SetFoP("Disabled", false);
+                }
                 if (!isLoaded)
                 {
                     await (Task)plugin.GetType().GetMethod("LoadAsync")?.Invoke(plugin, new object[] { 3, false });
