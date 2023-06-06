@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text;
@@ -128,7 +129,9 @@ public class MainWindow : Window, IDisposable
                         Plugin.PluginReload(pname);
                     };
                     RightClickToCopyCmd($"/reload {pname}");
-                    if(!isDisabled&&!disabled&&(bool)p.GetFoP("DalamudInterface").GetFoP("UiBuilder").GetFoP("HasConfigUi"))
+                    if(!isDisabled&&!disabled
+                        &&p.GetFoP("DalamudInterface") is not null
+                        &&(bool)p.GetFoP("DalamudInterface")?.GetFoP("UiBuilder")?.GetFoP("HasConfigUi"))
                     { 
                         ImGui.SameLine();
                         if (ImGui.Button($"UI##{pname}"))
@@ -199,27 +202,50 @@ public class MainWindow : Window, IDisposable
         }
         if (ImGui.BeginTabItem("Hooks"))
         {
-            if (ImGui.BeginTable("CommandManager", 4, ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable))
+            ImGui.InputText("Search", ref filterName, 10, ImGuiInputTextFlags.None);
+            if (ImGui.BeginTable("CommandManager", 5, ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable))
             {
-                ImGui.TableSetupColumn("Guid", ImGuiTableColumnFlags.None, 0.5f);
-                ImGui.TableSetupColumn("Addr", ImGuiTableColumnFlags.None, 0.5f);
+                ImGui.TableSetupColumn("Plugin", ImGuiTableColumnFlags.None, 0.5f);
+                ImGui.TableSetupColumn("Address", ImGuiTableColumnFlags.None, 0.5f);
                 ImGui.TableSetupColumn("Assembly", ImGuiTableColumnFlags.None, 0.5f);
                 ImGui.TableSetupColumn("Delegate", ImGuiTableColumnFlags.None, 0.5f);
+                ImGui.TableSetupColumn("Guid", ImGuiTableColumnFlags.None, 0.5f);
                 ImGui.TableHeadersRow();
                 dynamic hookDict = Plugin.hm.GetFoP("TrackedHooks");
-
+                Dictionary<string,object> sortedDict = new Dictionary<string,object>();
                 foreach (object hook in hookDict)
                 {
-                    var addr = hook.GetFoP("Value").GetFoP("InProcessMemory");
+                    var name = hook.GetFoP("Value").GetFoP("Delegate").ToString();
+                    if (!name.Contains(filterName, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!sortedDict.TryAdd(name, hook)) {
+                        sortedDict.TryAdd(name+ "#" +hook.GetFoP("Key").ToString().Substring(0,4), hook);
+                    };
+                }
+                sortedDict = sortedDict.OrderBy(x => x.Key).ToDictionary(x=>x.Key,x=>x.Value);
+                foreach (KeyValuePair<string,object>hook in sortedDict)
+                {
+                    var addr = hook.Value.GetFoP("Value").GetFoP("InProcessMemory");
                     if (addr == null || (ulong)addr == 0) continue;
+
                     ImGui.TableNextColumn();
-                    ImGui.Text(hook.GetFoP("Key").ToString());
+                    ImGui.Text(hook.Key.Split(".")[0]);//PluginName
                     ImGui.TableNextColumn();
-                    ImGui.Text($"ffxiv.exe+0x{addr:X}");
+                    if (ImGui.Button($"ffxiv.exe+0x{addr:X}"))
+                    {
+                    }
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip($"Right-click to copy");
+                        if(ImGui.IsItemClicked(ImGuiMouseButton.Right)) ImGui.SetClipboardText($"0x{0x140000000+(ulong)addr:x}");
+                    }
+
                     ImGui.TableNextColumn();
-                    ImGui.Text(hook.GetFoP("Value").GetFoP("Assembly").ToString().Split(",")[0]);
+                    ImGui.Text(hook.Value.GetFoP("Value").GetFoP("Assembly").ToString().Split(',')[0]);
                     ImGui.TableNextColumn();
-                    ImGui.Text($"{hook.GetFoP("Value").GetFoP("Delegate")}");
+                    ImGui.Text($"{hook.Value.GetFoP("Value").GetFoP("Delegate")}");
+
+                    ImGui.TableNextColumn();
+                    ImGui.Text(hook.Value.GetFoP("Key").ToString());//GUID
                 }
                 ImGui.EndTable();
             }
