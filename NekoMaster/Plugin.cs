@@ -249,14 +249,16 @@ namespace NekoMaster
 
         private void DrawUI()
         {
-            ImGui.BeginMainMenuBar();
-            if (ImGui.BeginMenu("NekoMaster"))
+            if (DalamudApi.PluginInterface.IsDevMenuOpen)
             {
-                MainWindow.Toggle();
-                ImGui.EndMenu();
+                ImGui.BeginMainMenuBar();
+                if (ImGui.BeginMenu("NekoMaster"))
+                {
+                    MainWindow.Toggle();
+                    ImGui.EndMenu();
+                }
+                ImGui.EndMainMenuBar();
             }
-            ImGui.EndMainMenuBar();
-
             this.WindowSystem.Draw();
         }
 
