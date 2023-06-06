@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Reflection;
 using System.Text;
 using System.Xml.Linq;
 using Dalamud.Game.Command;
+using Dalamud.Hooking.Internal;
 using Dalamud.Interface.Windowing;
 using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
@@ -36,6 +39,7 @@ public class MainWindow : Window, IDisposable
     private string filterName = string.Empty;
     public override void Draw()
     {
+
         ImGui.BeginTabBar("NekoNeko");
 
         if (ImGui.BeginTabItem("Plugins")) { 
@@ -124,6 +128,20 @@ public class MainWindow : Window, IDisposable
                         Plugin.PluginReload(pname);
                     };
                     RightClickToCopyCmd($"/reload {pname}");
+                    if(!isDisabled&&!disabled&&(bool)p.GetFoP("DalamudInterface").GetFoP("UiBuilder").GetFoP("HasConfigUi"))
+                    { 
+                        ImGui.SameLine();
+                        if (ImGui.Button($"UI##{pname}"))
+                        {
+                            Plugin.PluginOpenUI(pname);
+                        }
+                        RightClickToCopyCmd($"/openui {pname}");
+                    }
+                    else
+                    {
+                        ImGui.SameLine();
+                        ImGui.Button($"X  ##{pname}");
+                    }
                 }
                 ImGui.EndTable();
             }
@@ -133,6 +151,7 @@ public class MainWindow : Window, IDisposable
         
 
         if (ImGui.BeginTabItem("Commands")) {
+            
             ImGui.InputText($"##genic",ref CmdGicArg, 64);
             ImGui.SameLine();
             if (ImGui.Button("Dispatch"))
@@ -140,7 +159,10 @@ public class MainWindow : Window, IDisposable
                 PluginLog.Log(CmdGicArg);
                 DalamudApi.CommandManager.ProcessCommand(CmdGicArg);
             }
-            if (ImGui.BeginTable("CommandManager", 4, ImGuiTableFlags.ScrollY )) {
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(64 * 2);
+            ImGui.InputText("Search", ref filterName, 10, ImGuiInputTextFlags.None);
+            if (ImGui.BeginTable("CommandManager", 4, ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable)) {
                 ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.None, 0.5f);
                 ImGui.TableSetupColumn("Args", ImGuiTableColumnFlags.None, 0.5f);
                 ImGui.TableSetupColumn("Asseambly", ImGuiTableColumnFlags.None,0.5f);
@@ -148,6 +170,8 @@ public class MainWindow : Window, IDisposable
                 ImGui.TableHeadersRow();
                 foreach (KeyValuePair<string, CommandInfo> cmd in DalamudApi.CommandManager.Commands)
                 {
+                    var ass = (string)cmd.Value.GetFoP("LoaderAssemblyName");
+                    if (!ass.Contains(filterName,StringComparison.OrdinalIgnoreCase)) continue;
                     if (!CmdTempArg.ContainsKey(cmd.Key))
                     {
                         CmdTempArg.Add(cmd.Key, string.Empty);
@@ -163,11 +187,40 @@ public class MainWindow : Window, IDisposable
                     ImGui.InputText($"##{cmd.Key}", ref arg, 64);
                     CmdTempArg[cmd.Key] = arg;
                     ImGui.TableNextColumn();
-                    ImGui.Text((string)cmd.Value.GetFoP("LoaderAssemblyName"));
+                    ImGui.Text(ass);
                     ImGui.TableNextColumn();
                     ImGui.Text(cmd.Value.HelpMessage);
                 }
 
+                ImGui.EndTable();
+            }
+            ImGui.EndTabItem();
+            
+        }
+        if (ImGui.BeginTabItem("Hooks"))
+        {
+            if (ImGui.BeginTable("CommandManager", 4, ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable))
+            {
+                ImGui.TableSetupColumn("Guid", ImGuiTableColumnFlags.None, 0.5f);
+                ImGui.TableSetupColumn("Addr", ImGuiTableColumnFlags.None, 0.5f);
+                ImGui.TableSetupColumn("Assembly", ImGuiTableColumnFlags.None, 0.5f);
+                ImGui.TableSetupColumn("Delegate", ImGuiTableColumnFlags.None, 0.5f);
+                ImGui.TableHeadersRow();
+                dynamic hookDict = Plugin.hm.GetFoP("TrackedHooks");
+
+                foreach (object hook in hookDict)
+                {
+                    var addr = hook.GetFoP("Value").GetFoP("InProcessMemory");
+                    if (addr == null || (ulong)addr == 0) continue;
+                    ImGui.TableNextColumn();
+                    ImGui.Text(hook.GetFoP("Key").ToString());
+                    ImGui.TableNextColumn();
+                    ImGui.Text($"ffxiv.exe+0x{addr:X}");
+                    ImGui.TableNextColumn();
+                    ImGui.Text(hook.GetFoP("Value").GetFoP("Assembly").ToString().Split(",")[0]);
+                    ImGui.TableNextColumn();
+                    ImGui.Text($"{hook.GetFoP("Value").GetFoP("Delegate")}");
+                }
                 ImGui.EndTable();
             }
             ImGui.EndTabItem();

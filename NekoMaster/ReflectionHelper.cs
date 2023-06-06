@@ -80,6 +80,11 @@ public static class ReflectionHelper
             obj.GetType().Assembly.GetType(type).GetProperty(name, StaticFlags).SetValue(null, value);
         }
     }
+    public static object CallEvent(this object obj, string name, params object[] values)
+    {
+        var einfo= obj.GetType().GetEvent(name);
+        return einfo.RaiseMethod.Invoke(obj, values);
+    }
 
     public static object Call(this object obj, string name, params object[] values)
     {

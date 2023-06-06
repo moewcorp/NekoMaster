@@ -10,6 +10,7 @@ using System.Reflection;
 using NekoMaster.Windows;
 using NekoMaster.Reflection;
 using System.Threading.Tasks;
+using ImGuiNET;
 
 namespace NekoMaster
 {
@@ -18,8 +19,9 @@ namespace NekoMaster
         public string Name => "NekoMaster";
         private DalamudPluginInterface pi { get; init; }
         private CommandManager cmd { get; init; }
-        private Assembly da { get; init; }
-        private object pm { get; init; }
+        internal Assembly da { get; init; }
+        internal object pm { get; init; }
+        internal object hm { get; init; }
         public Configuration Configuration { get; init; }
         public WindowSystem WindowSystem = new("NekoMaster");
 
@@ -44,11 +46,12 @@ namespace NekoMaster
 
             this.da = pi.GetType().Assembly;
             this.pm = da.GetService("Dalamud.Service`1", "Dalamud.Plugin.Internal.PluginManager");
+            this.hm = da.GetService("Dalamud.Service`1", "Dalamud.Hooking.Internal.HookManager");
 
-            
             this.cmd.AddHandler("/load", new CommandInfo(OnCommand) { HelpMessage = "load plugin" });
             this.cmd.AddHandler("/unload", new CommandInfo(OnCommand) { HelpMessage = "unload plugin" });
             this.cmd.AddHandler("/reload", new CommandInfo(OnCommand) { HelpMessage = "reload plugin" });
+            this.cmd.AddHandler("/openui", new CommandInfo(OnCommand) { HelpMessage = "open plugin ui" });
             this.cmd.AddHandler("/loadall", new CommandInfo(OnCommand) { HelpMessage =   "load all plugins" });
             this.cmd.AddHandler("/unloadall", new CommandInfo(OnCommand) { HelpMessage = "unload all plugins" });
             this.cmd.AddHandler("/reloadall", new CommandInfo(OnCommand) { HelpMessage = "reload all plugins" });
@@ -133,6 +136,23 @@ namespace NekoMaster
                 PluginLog.Error($"{e.Message}\n{e.StackTrace}");
             }
         }
+        public void PluginOpenUI(string name)
+        {
+            try
+            {
+                var plugin = PluginQuery(name);
+                PluginLog.Log($"{plugin}");
+                bool isLoaded = (bool)plugin.GetFoP("IsLoaded");
+                
+                if (!isLoaded) return;
+                plugin.GetFoP("DalamudInterface").GetFoP("UiBuilder").Call("OpenConfig", new object[] { });
+            }
+            catch (Exception e)
+            {
+                PluginLog.Error($"{e.Message}\n{e.StackTrace}");
+            }
+        }
+
         public async void ErrorFuck()
         {
             dynamic installedPlugins = pm.GetBF("InstalledPlugins");
@@ -200,6 +220,7 @@ namespace NekoMaster
             this.cmd.RemoveHandler("/reloadall");
             this.cmd.RemoveHandler("/errorfuck");
             this.cmd.RemoveHandler("/unloadthd");
+            this.cmd.RemoveHandler("/openui");
             this.WindowSystem.RemoveAllWindows();
             
             MainWindow.Dispose();
@@ -221,18 +242,27 @@ namespace NekoMaster
                 case "/reloadall": PluginReloadAll(); break;
                 case "/errorfuck": ErrorFuck(); break;
                 case "/unloadthd": PluginUnloadThird(); break;
+                case "/openui": PluginOpenUI(args); break;
                 default: ;break;
             }
         }
 
         private void DrawUI()
         {
+            ImGui.BeginMainMenuBar();
+            if (ImGui.BeginMenu("NekoMaster"))
+            {
+                MainWindow.Toggle();
+                ImGui.EndMenu();
+            }
+            ImGui.EndMainMenuBar();
+
             this.WindowSystem.Draw();
         }
 
         public void DrawConfigUI()
         {
-            MainWindow.IsOpen = true;
+            MainWindow.Toggle();
         }
     }
 }
